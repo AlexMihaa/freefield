@@ -244,6 +244,12 @@ npm run app -- create-image --set prompt="a red bicycle against a white wall"   
 
 On Windows PowerShell, environment variables go before the command as `$env:FREEFIELD_GPU = "A10G"; modal deploy ...`.
 
+### Qudata NVIDIA backend image (fork packaging)
+
+See [the Qudata template guide](docs/qudata.md) for a model-free Docker backend,
+exact template fields and SSH-only access. The image is published only after CPU
+integration checks; these checks do not replace a real GPU/Qudata canary.
+
 ### On your own GPU, without Modal
 
 `tools/local_backend.py` runs the same backend as `infra/modal_app.py`, on your machine: ComfyUI at the pinned commit
