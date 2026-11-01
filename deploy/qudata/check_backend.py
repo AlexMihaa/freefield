@@ -12,7 +12,7 @@ for attempt in range(180):
         with urlopen(base + "/health", timeout=2) as response:
             assert json.load(response)["ok"] is True
         break
-    except (URLError, TimeoutError):
+    except (URLError, TimeoutError, ConnectionError):
         time.sleep(2)
 else:
     raise SystemExit("Gateway did not become healthy within six minutes")

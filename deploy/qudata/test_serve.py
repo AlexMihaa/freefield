@@ -1,11 +1,25 @@
 """No torch, GPU, models or network needed for startup policy tests."""
 import unittest
+import io
+import os
+import runpy
+from pathlib import Path
+from unittest import mock
+from urllib.error import HTTPError
 from serve import configuration
 
 
 class StartupPolicy(unittest.TestCase):
     def env(self, **extra):
         return {"FREEFIELD_TOKEN": "a" * 64, **extra}
+
+    def test_probe_retries_socket_reset_during_cold_start(self):
+        responses = [ConnectionResetError("cold start"), io.BytesIO(b'{"ok":true}'),
+                     HTTPError("http://local", 401, "unauthorized", {}, None),
+                     HTTPError("http://local", 401, "unauthorized", {}, None),
+                     io.BytesIO(b'{"comfyui":{}}'), io.BytesIO(b'{"current":"smoke"}')]
+        with mock.patch.dict(os.environ, self.env()), mock.patch("urllib.request.urlopen", side_effect=responses), mock.patch("time.sleep"):
+            runpy.run_path(str(Path(__file__).with_name("check_backend.py")), run_name="__main__")
 
     def test_cuda_by_default(self):
         self.assertEqual(configuration(self.env()), [])

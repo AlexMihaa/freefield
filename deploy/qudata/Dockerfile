@@ -30,7 +30,6 @@ COPY tools /opt/freefield/tools
 COPY packs /opt/freefield/packs
 COPY apps /opt/freefield/apps
 COPY LICENSE /opt/freefield/LICENSE
-COPY deploy/qudata/start.sh deploy/qudata/serve.py deploy/qudata/wait_ready.py /opt/freefield-qudata/
 RUN git init /opt/comfyui \
     && git -C /opt/comfyui remote add origin https://github.com/Comfy-Org/ComfyUI.git \
     && git -C /opt/comfyui fetch --depth 1 origin e3bee7ffcb7d6547ed0bcd15221792f3b8646b17 \
@@ -40,6 +39,7 @@ RUN git init /opt/comfyui \
     && /opt/conda/bin/python -m pip freeze > /opt/freefield-qudata/installed-python.txt \
     && mkdir -p /data/freefield/models /data/freefield/logs /run/sshd \
     && printf 'PasswordAuthentication no\nPermitRootLogin prohibit-password\n' > /etc/ssh/sshd_config.d/freefield.conf
+COPY deploy/qudata/start.sh deploy/qudata/serve.py deploy/qudata/wait_ready.py /opt/freefield-qudata/
 WORKDIR /opt/freefield
 EXPOSE 8000/tcp
 HEALTHCHECK --interval=30s --timeout=5s --start-period=300s --retries=3 \

@@ -13,7 +13,7 @@ for attempt in range(180):
         if isinstance(status.get("comfyui"), dict) and "error" not in status["comfyui"]:
             print("FreeField backend ready on internal port 8000 (token protected)")
             break
-    except (URLError, TimeoutError, ValueError):
+    except (URLError, TimeoutError, ConnectionError, ValueError):
         pass
     time.sleep(2)
 else:

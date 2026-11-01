@@ -38,6 +38,8 @@ jobs:
           push: false
           tags: ${{ env.LOCAL_IMAGE }}
           build-args: FREEFIELD_REVISION=${{ github.sha }}
+          cache-from: type=gha,scope=qudata-gpu
+          cache-to: type=gha,scope=qudata-gpu,mode=max,ignore-error=true
       - name: Create ephemeral test token
         run: |
           token="$(openssl rand -hex 32)"
