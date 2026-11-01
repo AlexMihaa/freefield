@@ -1,0 +1,13 @@
+**
+!LICENSE
+!apps/
+!apps/**
+!packs/
+!packs/**
+!infra/
+!infra/**
+!tools/
+!tools/**
+!deploy/
+!deploy/qudata/
+!deploy/qudata/**
