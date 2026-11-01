@@ -21,7 +21,7 @@ def configuration(environ: dict[str, str]) -> list[str]:
     args = shlex.split(environ.get("FREEFIELD_COMFY_ARGS", ""))
     # Exact allowlist: upstream argparse accepts abbreviated options, so a
     # denylist alone would let --lis override --listen and expose ComfyUI.
-    flags = {"--lowvram", "--normalvram", "--highvram", "--disable-smart-memory", "--use-pytorch-cross-attention", "--force-fp32", "--force-fp16"}
+    flags = {"--lowvram", "--highvram", "--disable-smart-memory", "--use-pytorch-cross-attention", "--force-fp32", "--force-fp16"}
     index = 0
     while index < len(args):
         argument = args[index]

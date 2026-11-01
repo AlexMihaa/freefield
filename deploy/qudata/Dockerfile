@@ -13,13 +13,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
     HF_HOME=/data/freefield/cache/huggingface \
     HF_HUB_OFFLINE=1 \
     TRANSFORMERS_OFFLINE=1 \
-    COMFY_KITCHEN_DISABLE_CUDA=1 \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility
-# comfy-kitchen's upstream binary wheels target CUDA 13. Use its PyTorch/
-# Triton fallbacks in this CUDA 12.8 image instead of loading CUDA 13 kernels.
+# Runtime compilation tools are included for PyTorch/Triton GPU paths.
+# Native optional kernels and actual GPU performance need a real-device test.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git ca-certificates ffmpeg libgl1 libglib2.0-0 openssh-server tini util-linux procps \
+    git ca-certificates ffmpeg libgl1 libglib2.0-0 openssh-server tini util-linux procps build-essential \
     && apt-get clean \
     && /opt/conda/bin/python -c "from pathlib import Path; root=Path('/etc/ssh'); assert root.resolve()==root; paths=list(root.glob('ssh_host_*')); assert all(p.resolve().parent==root and p.is_file() for p in paths); [p.unlink() for p in paths]"
 # Remove apt-generated private SSH host keys in the SAME layer that creates
