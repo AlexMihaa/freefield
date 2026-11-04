@@ -12,6 +12,7 @@ import { hooks, feed } from "./feed.js";
 import { openViewer } from "./viewer.js";
 import { openCompare } from "./compare.js";
 import { flags } from "./flags.js";
+import { cloudView, settingsView } from "./openrouter.js";
 
 const main = el("main", { id: "main", class: "view" });
 let bar = null;
@@ -19,6 +20,8 @@ let current = null;
 
 function route() {
   const hash = location.hash || "#/";
+  if (hash === "#/settings") return settingsView();
+  if (hash.startsWith("#/cloud")) return cloudView(hash.split("/")[2]);
   const m = /^#\/app\/([\w-]+)/.exec(hash);
   if (m) {
     const view = workspaceView(m[1]);

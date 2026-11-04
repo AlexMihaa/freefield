@@ -4,6 +4,7 @@ import { el, icon, logoMark, api, popover, closePopover, toast, live } from "./u
 import { t, lang, LANGS, setLang } from "./i18n.js";
 import { byId, FEATURED } from "./catalog.js";
 import { attachMenus } from "./menu.js";
+import { settingsLabel } from "./openrouter.js";
 
 export const gpuState = { data: null, listeners: new Set() };
 let pollTimer = null;
@@ -75,12 +76,12 @@ export function topbar({ onLang }) {
   gpuState.listeners.clear();   // a rebuilt bar (language change) replaces the old pill
   const items = [
     ["explore", "#/", "compass"], ["image", "#/image", "image"], ["video", "#/video", "video"], ["audio", "#/audio", "audio"],
-    ["apps", "#/apps", "layers"], ["library", "#/library", "film"],
+    ["apps", "#/apps", "layers"], ["library", "#/library", "film"], ["cloud", "#/cloud", "spark"],
   ];
   const links = new Map();
   const nav = el("nav", { class: "nav-main", "aria-label": "Freefield" });
   for (const [key, hash] of items) {
-    const a = el("a", { href: hash }, t(`nav.${key}`));
+    const a = el("a", { href: hash }, (key === "cloud" ? "OpenRouter" : t(`nav.${key}`)));
     links.set(key, a);
     nav.append(a);
   }
@@ -94,19 +95,21 @@ export function topbar({ onLang }) {
   }
   const vram = el("a", { class: "icon-btn", href: "#/vram", title: t("nav.vram"), "aria-label": t("nav.vram") }, icon("chip"));
   links.set("vram", vram);
+  const settingsLink = el("a", { class: "icon-btn", href: "#/settings", title: settingsLabel(), "aria-label": settingsLabel() }, "⚙");
+  links.set("settings", settingsLink);
   const langBtn = el("button", { class: "icon-btn", type: "button", title: t("nav.lang"), "aria-label": t("nav.lang") }, icon("globe"));
   langBtn.onclick = () => popover(langBtn, el("div", {}, ...LANGS.map(([code, name]) => el("button", { class: "opt", type: "button", "aria-selected": String(code === lang),
     onclick: () => { closePopover(); setLang(code); onLang(); } }, name, el("span", { class: "chk" }, icon("check"))))), { align: "end" });
   // phones: the same links in a menu
   const menuBtn = el("button", { class: "icon-btn menu-btn", type: "button", "aria-label": t("nav.menu") }, icon("menu"));
-  menuBtn.onclick = () => popover(menuBtn, el("div", {}, ...[...items.map(([key, hash, ic]) => [t(`nav.${key}`), hash, ic]),
+  menuBtn.onclick = () => popover(menuBtn, el("div", {}, ...[...items.map(([key, hash, ic]) => [(key === "cloud" ? "OpenRouter" : t(`nav.${key}`)), hash, ic]),
     ...FEATURED.filter((f) => byId.has(f.id)).map((f) => [byId.get(f.id).name, `#/app/${f.id}`, "spark"]), [t("nav.vram"), "#/vram", "chip"]]
     .map(([label, hash, ic]) => el("a", { class: "opt", href: hash, onclick: closePopover }, icon(ic), label))));
   const bar = el("header", { class: "topbar" },
     menuBtn,
     el("a", { class: "logo", href: "#/", "aria-label": "Freefield" }, logoMark(), el("span", { class: "word" }, "freefield")),
     nav,
-    el("div", { class: "nav-right" }, vram, langBtn, gpuPill(), el("a", { class: "btn lime small cta", href: "#/image" }, icon("spark"), t("nav.create"))));
+    el("div", { class: "nav-right" }, settingsLink, vram, langBtn, gpuPill(), el("a", { class: "btn lime small cta", href: "#/image" }, icon("spark"), t("nav.create"))));
   attachMenus(bar, links);
   if (!pollTimer) pollGpu();
   return {

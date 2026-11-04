@@ -26,6 +26,7 @@ import { loadRegistry, repoRoot, isFileInput, type App } from "./registry.ts";
 import { explainSubmitError, InputError, resolveValues, Runner, type Values } from "./runner.ts";
 import { History } from "./history.ts";
 import { Flags } from "./flags.ts";
+import { OpenRouter, validateParameters } from "./openrouter.ts";
 import { DOOR_HTML, Guard } from "./guard.ts";
 
 const root = repoRoot();
@@ -43,6 +44,7 @@ let runner: Runner | null = null;
 const getRunner = () => (runner ??= new Runner());
 const draftsAllowed = process.env.FREEFIELD_DRAFTS === "1";
 const outDir = process.env.FREEFIELD_OUT || join(root, "out");
+const cloud = new OpenRouter(join(outDir, "openrouter"));
 const guard = Guard.fromEnv(join(outDir, "limits.json"));
 const maxUploadMb = Number(process.env.FREEFIELD_MAX_UPLOAD_MB || (guard.hosted ? 100 : 0));
 
@@ -262,6 +264,56 @@ const server = createServer(async (req, res) => {
     }
     if (parts[0] === "api") {
       const [, area, id, sub, arg] = parts;
+      if (area === "settings" || area === "openrouter") {
+        if (guard.hosted) return send(res, 403, { error: "OpenRouter is disabled on the hosted demo" });
+        if (req.method === "POST") {
+          if (!req.headers["content-type"]?.startsWith("application/json")) return send(res, 415, { error: "Expected application/json" });
+          if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}` && req.headers.origin !== `https://${req.headers.host}`) return send(res, 403, { error: "Cross-origin request refused" });
+        }
+        const jsonBody = async () => {
+          const chunks: Buffer[] = []; let size = 0;
+          for await (const chunk of req) {
+            size += chunk.length;
+            if (size > Math.min(maxUploadMb || 40, 40) * 2 ** 20) throw new InputError("OpenRouter uploads are limited to 40 MB of JSON (about 30 MB before base64)");
+            chunks.push(chunk);
+          }
+          try { return JSON.parse(Buffer.concat(chunks).toString()); } catch { throw new InputError("Invalid JSON"); }
+        };
+        if (area === "settings" && parts.length === 2) {
+          if (req.method === "GET") return send(res, 200, cloud.status());
+          if (req.method === "POST") return send(res, 200, cloud.saveSettings(await jsonBody()));
+        }
+        if (area === "openrouter") {
+          if (id === "check" && req.method === "POST") return send(res, 200, await cloud.check());
+          if (id === "models" && req.method === "GET") return send(res, 200, await cloud.catalog(url.searchParams.get("refresh") === "1"));
+          if (id === "endpoints" && req.method === "GET") return send(res, 200, await cloud.endpoints(await cloud.model(url.searchParams.get("model") || "", url.searchParams.get("kind") || "")));
+          if (id === "defaults" && req.method === "POST") {
+            const body = await jsonBody();
+            if (!body || typeof body.model !== "string" || typeof body.kind !== "string") throw new InputError("Expected model and kind");
+            const model = await cloud.model(body.model, body.kind);
+            return send(res, 200, cloud.saveDefault(model, validateParameters(model, body.parameters ?? {})));
+          }
+          if (id === "runs") {
+            if (req.method === "GET" && !sub) return send(res, 200, { runs: cloud.list() });
+            if (req.method === "POST" && !sub) {
+              const prepared = await cloud.prepare(await jsonBody());
+              const refused = guard.refuse(activeRuns() + cloud.active());
+              if (refused) return send(res, 429, { error: refused });
+              const run = cloud.start(prepared); guard.record();
+              return send(res, 202, run);
+            }
+            if (req.method === "GET" && sub && !arg) { const run = cloud.get(sub); return send(res, run ? 200 : 404, run || { error: "Unknown cloud run" }); }
+            if ((req.method === "GET" || req.method === "HEAD") && sub && arg) {
+              const file = cloud.file(sub, arg);
+              // SVG images can contain scripts. Download rather than serve them in our origin.
+              if (file?.endsWith(".svg")) res.setHeader("content-disposition", 'attachment; filename="output.svg"');
+              if (file) { res.setHeader("content-security-policy", "default-src 'none'; sandbox"); res.setHeader("x-content-type-options", "nosniff"); }
+              return file ? sendFile(req, res, file, "private, max-age=31536000, immutable") : send(res, 404, { error: "Not found" });
+            }
+          }
+        }
+        return send(res, 404, { error: "Not found" });
+      }
       if (req.method === "GET" && area === "apps" && parts.length === 2) {
         const order = { image: 0, video: 1, audio: 2, utility: 3 } as Record<string, number>;
         const sorted = [...apps].sort((a, b) => order[a.section] - order[b.section]
@@ -355,6 +407,8 @@ const server = createServer(async (req, res) => {
     return send(res, status, { error: (e as Error).message });
   }
 });
+
+cloud.resume();
 
 // runs that were still going when the server stopped are followed again
 history.resume(async (jobId) => getRunner().jobs().get(jobId));

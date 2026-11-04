@@ -460,3 +460,11 @@ left out for the same reason: the first dresses people in the outfits of its exa
 a school uniform), the second puts gloved hands from someone unseen on the person's shoulders.
 
 Use footage and characters you own or have permission for; the apps are meant for SFW work.
+
+## OpenRouter cloud studio (fork)
+
+The fork adds settings for an OpenRouter API key and a cloud studio for images,
+video, speech/audio, transcription, text, embeddings, rerank and alpha typed
+operations. Models and form capabilities come from the live catalog. See
+[setup, storage, limitations and verification](docs/openrouter.md).
+This feature is prepared locally; the home deployment has not been updated.
