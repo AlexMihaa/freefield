@@ -27,6 +27,7 @@ import { explainSubmitError, InputError, resolveValues, Runner, type Values } fr
 import { History } from "./history.ts";
 import { Flags } from "./flags.ts";
 import { OpenRouter, validateParameters } from "./openrouter.ts";
+import { Fal, FAL_MODELS } from "./fal.ts";
 import { DOOR_HTML, Guard } from "./guard.ts";
 
 const root = repoRoot();
@@ -45,6 +46,7 @@ const getRunner = () => (runner ??= new Runner());
 const draftsAllowed = process.env.FREEFIELD_DRAFTS === "1";
 const outDir = process.env.FREEFIELD_OUT || join(root, "out");
 const cloud = new OpenRouter(join(outDir, "openrouter"));
+const fal = new Fal(join(outDir, "fal"));
 const guard = Guard.fromEnv(join(outDir, "limits.json"));
 const maxUploadMb = Number(process.env.FREEFIELD_MAX_UPLOAD_MB || (guard.hosted ? 100 : 0));
 
@@ -264,8 +266,8 @@ const server = createServer(async (req, res) => {
     }
     if (parts[0] === "api") {
       const [, area, id, sub, arg] = parts;
-      if (area === "settings" || area === "openrouter") {
-        if (guard.hosted) return send(res, 403, { error: "OpenRouter is disabled on the hosted demo" });
+      if (area === "settings" || area === "openrouter" || area === "fal") {
+        if (guard.hosted) return send(res, 403, { error: "Cloud providers are disabled on the hosted demo" });
         if (req.method === "POST") {
           if (!req.headers["content-type"]?.startsWith("application/json")) return send(res, 415, { error: "Expected application/json" });
           if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}` && req.headers.origin !== `https://${req.headers.host}`) return send(res, 403, { error: "Cross-origin request refused" });
@@ -274,7 +276,7 @@ const server = createServer(async (req, res) => {
           const chunks: Buffer[] = []; let size = 0;
           for await (const chunk of req) {
             size += chunk.length;
-            if (size > Math.min(maxUploadMb || 40, 40) * 2 ** 20) throw new InputError("OpenRouter uploads are limited to 40 MB of JSON (about 30 MB before base64)");
+            if (size > Math.min(maxUploadMb || 40, 40) * 2 ** 20) throw new InputError("Cloud uploads are limited to 40 MB of JSON (about 30 MB before base64)");
             chunks.push(chunk);
           }
           try { return JSON.parse(Buffer.concat(chunks).toString()); } catch { throw new InputError("Invalid JSON"); }
@@ -282,6 +284,27 @@ const server = createServer(async (req, res) => {
         if (area === "settings" && parts.length === 2) {
           if (req.method === "GET") return send(res, 200, cloud.status());
           if (req.method === "POST") return send(res, 200, cloud.saveSettings(await jsonBody()));
+        }
+        if (area === "fal") {
+          if (id === "settings" && parts.length === 3) {
+            if (req.method === "GET") return send(res, 200, fal.status());
+            if (req.method === "POST") return send(res, 200, fal.saveSettings(await jsonBody()));
+          }
+          if (id === "models" && req.method === "GET") return send(res, 200, { models: FAL_MODELS });
+          if (id === "runs") {
+            if (req.method === "GET" && !sub) return send(res, 200, { runs: fal.list() });
+            if (req.method === "POST" && !sub) {
+              const input = fal.prepare(await jsonBody());
+              const refused = guard.refuse(activeRuns() + cloud.active() + fal.active());
+              if (refused) return send(res, 429, { error: refused });
+              const run = fal.start(input); guard.record(); return send(res, 202, run);
+            }
+            if (req.method === "GET" && sub && !arg) { const run = fal.get(sub); return send(res, run ? 200 : 404, run || { error: "Unknown fal run" }); }
+            if ((req.method === "GET" || req.method === "HEAD") && sub && arg) {
+              const file = fal.file(sub, arg);
+              return file ? sendFile(req, res, file, "private, max-age=31536000, immutable") : send(res, 404, { error: "Not found" });
+            }
+          }
         }
         if (area === "openrouter") {
           if (id === "check" && req.method === "POST") return send(res, 200, await cloud.check());
@@ -297,7 +320,7 @@ const server = createServer(async (req, res) => {
             if (req.method === "GET" && !sub) return send(res, 200, { runs: cloud.list() });
             if (req.method === "POST" && !sub) {
               const prepared = await cloud.prepare(await jsonBody());
-              const refused = guard.refuse(activeRuns() + cloud.active());
+              const refused = guard.refuse(activeRuns() + cloud.active() + fal.active());
               if (refused) return send(res, 429, { error: refused });
               const run = cloud.start(prepared); guard.record();
               return send(res, 202, run);
@@ -336,7 +359,7 @@ const server = createServer(async (req, res) => {
         if (!app) return send(res, 404, { error: "unknown app" });
         if (!app.workflowPath) throw new InputError(`${app.id} has no workflow yet`);
         if (!runnable(app)) throw new InputError(`${app.id} is a draft; start the server with FREEFIELD_DRAFTS=1 to run it anyway`);
-        const refused = guard.refuse(activeRuns());
+        const refused = guard.refuse(activeRuns() + cloud.active() + fal.active());
         if (refused) return send(res, 429, { error: refused });
         const { values, preset } = await readValues(app, await toRequest(req));
         const view = startRun(app, resolveValues(app, values), preset);
@@ -409,6 +432,7 @@ const server = createServer(async (req, res) => {
 });
 
 cloud.resume();
+fal.resume();
 
 // runs that were still going when the server stopped are followed again
 history.resume(async (jobId) => getRunner().jobs().get(jobId));

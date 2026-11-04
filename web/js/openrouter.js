@@ -1,5 +1,6 @@
 import { el, api, toast } from './util.js';
 import { lang } from './i18n.js';
+import { falSettingsPanel } from './fal.js';
 
 const l = (ru, en, es = en) => lang === 'ru' ? ru : lang === 'es' ? es : en;
 export const cloudLabel = () => l('Облачная студия', 'Cloud studio', 'Estudio en la nube');
@@ -36,7 +37,8 @@ export function settingsView() {
       el('div', { class: 'or-actions' }, save, button(l('Проверить подключение', 'Test connection'), () => safe(result, async () => { const r = await jsonPost('/api/openrouter/check', {}); result.textContent = l('Подключение работает.', 'Connection works.') + (r.limit_remaining !== null ? ` $${r.limit_remaining}` : ''); })), button(l('Удалить сохранённый токен', 'Remove saved key'), () => safe(result, async () => { draw(await jsonPost('/api/settings', { key: '' })); result.textContent = l('Сохранённый токен удалён. Ключ из окружения, если задан, продолжает действовать.', 'Saved key removed. An environment key, if configured, still applies.'); }))), result),
     el('section', { class: 'or-settings' }, el('h2', {}, l('Модели по умолчанию', 'Default models')), el('p', { class: 'dim' }, l('Выберите модель и параметры в облачной студии и нажмите «Сохранить по умолчанию».', 'Choose a model and parameters in the cloud studio, then select “Save as default”.')), defaults,
       el('a', { href: '#/cloud', class: 'btn lime' }, cloudLabel())));
-  return { node, active: 'settings', dispose() { disposed = true; key.value = ''; } };
+  const falPanel = falSettingsPanel(); node.append(falPanel.node);
+  return { node, active: 'settings', dispose() { disposed = true; key.value = ''; falPanel.dispose(); } };
 }
 
 async function dataURL(file) {
@@ -234,6 +236,7 @@ export function cloudView(initialKind = 'image') {
     } catch (e) { if (!disposed) { history.replaceChildren(el('p', { class: 'or-error' }, e.message)); timer = setTimeout(refreshHistory, 15000); } }
   }
   const node = el('div', { class: 'page or-page' }, el('div', { class: 'or-heading' }, el('div', {}, el('h1', { class: 'display or-title' }, cloudLabel()), connection), button(l('Обновить модели', 'Refresh models'), () => load(true))),
+    el('div', { class: 'or-provider-tabs' }, el('a', { href: '#/cloud', class: 'btn lime small', 'aria-current': 'page' }, 'OpenRouter'), el('a', { href: '#/fal', class: 'btn small' }, 'fal.ai')),
     el('div', { class: 'or-layout' }, form, el('section', { class: 'or-results' }, el('h2', {}, l('Облачная история', 'Cloud history')), history)));
   load(); refreshHistory();
   return { node, active: 'cloud', dispose() { disposed = true; clearTimeout(timer); } };

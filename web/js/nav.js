@@ -76,12 +76,12 @@ export function topbar({ onLang }) {
   gpuState.listeners.clear();   // a rebuilt bar (language change) replaces the old pill
   const items = [
     ["explore", "#/", "compass"], ["image", "#/image", "image"], ["video", "#/video", "video"], ["audio", "#/audio", "audio"],
-    ["apps", "#/apps", "layers"], ["library", "#/library", "film"], ["cloud", "#/cloud", "spark"],
+    ["apps", "#/apps", "layers"], ["library", "#/library", "film"], ["cloud", "#/cloud", "spark"], ["fal", "#/fal", "spark"],
   ];
   const links = new Map();
   const nav = el("nav", { class: "nav-main", "aria-label": "Freefield" });
   for (const [key, hash] of items) {
-    const a = el("a", { href: hash }, (key === "cloud" ? "OpenRouter" : t(`nav.${key}`)));
+    const a = el("a", { href: hash }, (key === "cloud" ? "OpenRouter" : key === "fal" ? "fal.ai" : t(`nav.${key}`)));
     links.set(key, a);
     nav.append(a);
   }
@@ -102,7 +102,7 @@ export function topbar({ onLang }) {
     onclick: () => { closePopover(); setLang(code); onLang(); } }, name, el("span", { class: "chk" }, icon("check"))))), { align: "end" });
   // phones: the same links in a menu
   const menuBtn = el("button", { class: "icon-btn menu-btn", type: "button", "aria-label": t("nav.menu") }, icon("menu"));
-  menuBtn.onclick = () => popover(menuBtn, el("div", {}, ...[...items.map(([key, hash, ic]) => [(key === "cloud" ? "OpenRouter" : t(`nav.${key}`)), hash, ic]),
+  menuBtn.onclick = () => popover(menuBtn, el("div", {}, ...[...items.map(([key, hash, ic]) => [(key === "cloud" ? "OpenRouter" : key === "fal" ? "fal.ai" : t(`nav.${key}`)), hash, ic]),
     ...FEATURED.filter((f) => byId.has(f.id)).map((f) => [byId.get(f.id).name, `#/app/${f.id}`, "spark"]), [t("nav.vram"), "#/vram", "chip"]]
     .map(([label, hash, ic]) => el("a", { class: "opt", href: hash, onclick: closePopover }, icon(ic), label))));
   const bar = el("header", { class: "topbar" },

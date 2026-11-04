@@ -468,3 +468,10 @@ video, speech/audio, transcription, text, embeddings, rerank and alpha typed
 operations. Models and form capabilities come from the live catalog. See
 [setup, storage, limitations and verification](docs/openrouter.md).
 This feature is prepared locally; the home deployment has not been updated.
+
+### fal.ai Motion Control
+
+Use **fal.ai** in the navigation to animate a character image with reference-video
+motion. Configure a separate fal API key in Settings. Kling 3.0/2.6 Standard/Pro,
+local photo/video uploads, HTTPS references, sound/orientation options and saved
+results are supported. See [setup and operational limits](docs/fal.md).

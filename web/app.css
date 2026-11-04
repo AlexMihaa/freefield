@@ -693,3 +693,7 @@ dl.vals dd { margin: 0; overflow-wrap: anywhere; }
 .or-defaults { margin-bottom: 20px; }
 @media (max-width: 850px) { .or-layout { grid-template-columns: 1fr; } .or-heading { align-items: start; flex-direction: column; } }
 @media (max-width: 480px) { .or-form, .or-settings { padding: 16px; } .or-parameters { grid-template-columns: 1fr; } .or-run-head { flex-direction: column; } .or-default { flex-direction: column; } }
+
+.or-provider-tabs { display:flex; flex-wrap:wrap; gap:10px; margin:0 0 24px; }
+.fal-check { display:flex; align-items:center; gap:10px; margin:0 0 20px; cursor:pointer; }
+.fal-check input { accent-color:var(--accent); width:18px; height:18px; }
