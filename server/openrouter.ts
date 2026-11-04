@@ -134,7 +134,13 @@ export class OpenRouter {
     }
     return res;
   }
-  async check() { if (!this.key()) throw new InputError('Set an OpenRouter key in Settings'); const r = await (await this.api('/api/v1/key')).json() as Obj; return { ok: true, limit_remaining: r.data?.limit_remaining ?? null }; }
+  async check() {
+    if (!this.key()) throw new InputError('Set an OpenRouter key in Settings');
+    const r = await (await this.api('/api/v1/key')).json() as Obj;
+    if (!object(r.data)) throw new Error('Invalid OpenRouter key-check response');
+    if (r.data.is_management_key || r.data.is_provisioning_key) throw new InputError('Management API keys cannot generate media. Create a regular API key at openrouter.ai/settings/keys and replace it in Settings.');
+    return { ok: true, limit_remaining: r.data.limit_remaining ?? null };
+  }
   async catalog(refresh = false) {
     if (!refresh && this.cached && Date.now() - this.cached.at < 5 * 60 * 1000) return this.cached;
     if (this.fetching) return this.fetching;
@@ -225,6 +231,16 @@ export class OpenRouter {
       const refs = payload.input_references;
       const cap = model.raw.supported_parameters?.input_references;
       if (!Array.isArray(refs) || !cap || (cap.max !== undefined && refs.length > cap.max)) throw new InputError('Reference images exceed this model capability');
+    }
+    if (model.kind === 'video' && payload.input_references !== undefined) {
+      if (!Array.isArray(payload.input_references)) throw new InputError('input_references must be an array');
+      for (const ref of payload.input_references) {
+        if (!object(ref) || !['image_url', 'video_url', 'audio_url'].includes(ref.type) || !object(ref[ref.type]) || typeof ref[ref.type].url !== 'string') throw new InputError('Invalid video reference');
+        if (ref.type === 'image_url' && /^data:image\/(png|jpeg|webp|gif);base64,/.test(ref.image_url.url)) continue;
+        let url: URL;
+        try { url = new URL(ref[ref.type].url); } catch { throw new InputError('Video references require a public HTTPS URL'); }
+        if (url.protocol !== 'https:' || url.username || url.password) throw new InputError('Video/audio references require a public HTTPS URL. Paste a link in the reference URL field; the OpenRouter video API does not accept inline video/audio uploads.');
+      }
     }
     if (model.kind === 'video' && payload.frame_images !== undefined) {
       if (!Array.isArray(payload.frame_images) || payload.frame_images.some((f: Obj) => !object(f) || !model.raw.supported_frame_images?.includes(f.frame_type))) throw new InputError('Unsupported frame type for this model');

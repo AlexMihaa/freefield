@@ -1,9 +1,9 @@
 # OpenRouter cloud studio
 
-## Current state — 2026-11-04
+## Implementation and verification — 2026-11-04
 
-Implemented in the fork, tested locally; **not deployed to the home server or
-GPU backend**. No paid requests were made. Existing ComfyUI apps and history keep
+Implemented in the fork and deployed to the home UI. No GPU backend changes
+are required. Agent verification does not submit paid generations. Existing ComfyUI apps and history keep
 their current execution path. Cloud requests never wake or contact the GPU.
 
 Open **OpenRouter** in the navigation (`#/cloud`) and **Settings** (`#/settings`).
@@ -20,7 +20,7 @@ as a warning; missing capabilities are not silently invented.
 
 - Images: dedicated Image API, image references, model-advertised enum/range
   controls, multiple images, PNG/JPEG/WebP/SVG downloads.
-- Video: asynchronous jobs, supported durations/resolutions/aspect ratios,
+- Video: asynchronous jobs, HTTPS video/audio references, supported durations/resolutions/aspect ratios,
   first/last frames, references and source clips, audio toggle, seed, upscale
   factor/creativity when advertised. Input types come from the general catalog.
 - Speech and sounds: TTS binary audio, live voice list, delivery instructions,
@@ -86,9 +86,14 @@ No cloud cancel/delete action is offered; closing the browser does not stop work
 or billing. Cloud history is separate from the ComfyUI Library, in the cloud studio.
 
 Uploads: 25 MiB per file, 29 MiB total in the UI, at most 40 MiB JSON per request
-(or the lower configured upload limit). Files use inline base64. Some providers
-require public HTTPS URLs or impose tighter limits; supply native reference URLs
-in advanced options in that case. Do not use home LAN URLs for cloud provider input.
+(or the lower configured upload limit). Image and chat inputs use inline base64.
+The video-generation API rejects inline video/audio: use the dedicated HTTPS URL
+fields (one URL per line), including temporary signed URLs from your own storage.
+Video-mode file pickers accept images only. Server-side validation also rejects
+inline video/audio supplied via advanced JSON before creating a run. OpenRouter
+Files API does not accept video or expose uploaded files as downloadable HTTPS
+assets, so it cannot bridge this restriction. No third-party media host or public
+upload endpoint is enabled automatically. Do not use home LAN URLs for cloud provider input.
 PCM output is downloadable but not played as containerized audio in the browser.
 Only the first video output is downloaded when a provider returns several clips.
 
@@ -107,7 +112,7 @@ Tests use injected HTTP responses: catalog capabilities, private credential
 persistence, parameter validation, image output, binary TTS, transcription,
 text/reasoning, split SSE/UTF-8 audio, embeddings/rerank, alpha operations,
 video downloads, resume without resubmission, redaction and redirect credentials.
-60/60 tests passed, typecheck passed, and all 120 existing manifests validated
+62/62 tests passed, typecheck passed, and all 120 existing manifests validated
 with zero errors/warnings. The live public catalog and real localhost UI were
 checked without an API key at desktop 1440x1000 and mobile 390x844. HTTP smoke
 covered a fake-key save/remove round trip, no key disclosure, origin/content-type
@@ -123,3 +128,7 @@ Paid generation/provider billing has **not** been verified.
 - [Audio SSE](https://openrouter.ai/docs/guides/overview/multimodal/audio)
 - [Model discovery](https://openrouter.ai/docs/api/api-reference/models/get-models)
 - [Decisions](https://openrouter.ai/docs/api/api-reference/alphadecisions/submit-a-decisions-request)
+
+Key checks reject management/provisioning keys even if GET /api/v1/key returns
+200, since those keys cannot be used for generation. A regular inference key is
+required. Tests cover this distinction and HTTPS reference validation.

@@ -179,3 +179,23 @@ test('alpha decisions and extractions require native schema and preserve typed J
     assert.equal(r?.status, 'succeeded'); assert.equal(JSON.parse(r!.text!).result.name, 'Alice');
   }
 });
+
+test('video accepts HTTPS video/audio references and inline images, rejects inline video/audio before submission', async t => {
+  const { service, calls } = fixture(t);
+  const request = (refs: unknown) => ({ kind: 'video', model: video.id, prompt: 'dance', advanced: { input_references: refs } });
+  const refs = [{ type: 'image_url', image_url: { url: 'data:image/png;base64,AAAA' } }, { type: 'video_url', video_url: { url: 'https://storage.example/clip.mp4?signature=private' } }, { type: 'audio_url', audio_url: { url: 'https://storage.example/sound.mp3' } }];
+  assert.deepEqual((await service.prepare(request(refs))).payload.input_references, refs);
+  for (const ref of [{ type: 'video_url', video_url: { url: 'data:video/mp4;base64,AAAA' } }, { type: 'audio_url', audio_url: { url: 'data:audio/mpeg;base64,AAAA' } }, { type: 'video_url', video_url: { url: 'http://storage.example/clip.mp4' } }, { type: 'video_url', video_url: { url: 'https://user:password@storage.example/clip.mp4' } }, { type: 'video_url' }]) await assert.rejects(service.prepare(request([ref])));
+  assert.equal(calls.some(c => c.init?.method === 'POST'), false);
+  assert.deepEqual(service.list(), []);
+});
+
+test('key check rejects management/provisioning keys even when current-key endpoint returns 200', async t => {
+  let data: any = { is_management_key: true, is_provisioning_key: true };
+  const { service } = fixture(t, () => json({ data }));
+  await assert.rejects(service.check(), /Management API keys/);
+  data = { is_management_key: false, is_provisioning_key: true };
+  await assert.rejects(service.check(), /Management API keys/);
+  data = { is_management_key: false, is_provisioning_key: false, limit_remaining: 10 };
+  assert.deepEqual(await service.check(), { ok: true, limit_remaining: 10 });
+});

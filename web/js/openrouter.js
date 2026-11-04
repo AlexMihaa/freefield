@@ -71,6 +71,12 @@ export function cloudView(initialKind = 'image') {
   const last = el('input', { type: 'file', accept: 'image/*' });
   const firstField = field(l('Первый кадр', 'First frame'), first), lastField = field(l('Последний кадр', 'Last frame'), last);
   uploadField.hidden = firstField.hidden = lastField.hidden = documentsField.hidden = true;
+  const videoUrls = el('textarea', { rows: 2, placeholder: 'https://…/video.mp4', spellcheck: false });
+  const audioUrls = el('textarea', { rows: 2, placeholder: 'https://…/audio.mp3', spellcheck: false });
+  const urlHelp = l('Одна HTTPS-ссылка на файл в строке. Она должна открываться без входа в аккаунт; подойдёт временная подписанная ссылка вашего хранилища. Локальный адрес FreeField провайдеру недоступен.', 'One HTTPS file URL per line, accessible without sign-in. A temporary signed URL from your storage works. The provider cannot access your local Freefield address.');
+  const videoUrlsField = field(l('Видео-референсы (HTTPS)', 'Video references (HTTPS)'), videoUrls, urlHelp);
+  const audioUrlsField = field(l('Аудио-референсы (HTTPS)', 'Audio references (HTTPS)'), audioUrls, urlHelp);
+  videoUrlsField.hidden = audioUrlsField.hidden = true;
   const advanced = el('textarea', { rows: 5, placeholder: '{ "provider": { "options": {} } }', spellcheck: false });
   const endpointInfo = el('pre', { class: 'or-json' });
   const message = el('p', { role: 'status', 'aria-live': 'polite' });
@@ -99,6 +105,7 @@ export function cloudView(initialKind = 'image') {
     model = models.find(m => m.id === select.value && m.kind === kind.value) || null;
     controls.clear(); parameters.replaceChildren(); endpointInfo.textContent = ''; advanced.value = ''; uploads.value = ''; first.value = ''; last.value = '';
     runButton.disabled = !model || !settings.configured;
+    videoUrlsField.hidden = audioUrlsField.hidden = true;
     documentsField.hidden = kind.value !== 'rerank';
     if (!model) { info.textContent = l('Нет доступных моделей. Обновите каталог или выберите другой тип.', 'No models available. Refresh catalog or choose another type.'); uploadField.hidden = firstField.hidden = lastField.hidden = true; return; }
     info.replaceChildren(el('b', {}, model.name), el('p', { class: 'dim' }, model.description), el('a', { href: `https://openrouter.ai/${model.id}`, target: '_blank', rel: 'noopener', class: 'dim' }, l('Модель и цены на OpenRouter', 'Model and pricing on OpenRouter')));
@@ -111,14 +118,16 @@ export function cloudView(initialKind = 'image') {
     }
     if (model.raw.allowed_passthrough_parameters?.length) info.append(el('p', { class: 'dim' }, l('Параметры провайдера: ', 'Provider options: ') + model.raw.allowed_passthrough_parameters.join(', ')));
     const k = model.kind;
+    videoUrlsField.hidden = k !== 'video' || !model.inputs.includes('video');
+    audioUrlsField.hidden = k !== 'video' || !model.inputs.includes('audio');
     schemaField.hidden = !['decisions', 'extractions'].includes(k);
     schemaInput.placeholder = k === 'decisions' ? '{ "is_positive": { "type": "noul", "instructions": "Is the text positive?" } }' : '{ "name": { "type": "text", "instructions": "The person name" } }';
     promptField.hidden = k === 'transcription';
     documentsField.hidden = k !== 'rerank';
-    uploadField.hidden = !['image', 'video', 'speech', 'text', 'audio', 'transcription'].includes(k) || (k === 'image' && !model.raw.supported_parameters?.input_references) || (['text', 'audio'].includes(k) && !model.inputs.some(i => ['image', 'audio', 'video', 'file'].includes(i)));
+    uploadField.hidden = !['image', 'video', 'speech', 'text', 'audio', 'transcription'].includes(k) || (k === 'video' && !model.inputs.includes('image')) || (k === 'image' && !model.raw.supported_parameters?.input_references) || (['text', 'audio'].includes(k) && !model.inputs.some(i => ['image', 'audio', 'video', 'file'].includes(i)));
     uploads.multiple = k !== 'transcription';
-    uploads.accept = k === 'transcription' ? 'audio/*' : k === 'speech' ? 'audio/*,image/*' : k === 'image' ? 'image/*' : model.inputs.filter(i => ['image', 'audio', 'video', 'file'].includes(i)).map(i => i === 'file' ? '.pdf' : `${i}/*`).join(',');
-    uploadHelp.textContent = k === 'speech' ? l('Образец голоса и изображение сцены. Клонирование голоса и работа с изображениями поддерживаются отдельными провайдерами — проверьте их возможности ниже.', 'Voice sample and scene image. Voice cloning and image conditioning depend on provider capabilities; inspect them below.') : k === 'video' ? l('Референсы и исходное видео для редактирования/увеличения. Доступные типы определяются выбранной моделью.', 'References and source video for editing/upscaling. Accepted types depend on the selected model.') : l('До 25 МБ на файл, около 30 МБ суммарно. Вложения отправляются выбранному провайдеру.', 'Up to 25 MB per file, about 30 MB total. Attachments are sent to the selected provider.');
+    uploads.accept = k === 'transcription' ? 'audio/*' : k === 'speech' ? 'audio/*,image/*' : k === 'image' || k === 'video' ? 'image/*' : model.inputs.filter(i => ['image', 'audio', 'video', 'file'].includes(i)).map(i => i === 'file' ? '.pdf' : `${i}/*`).join(',');
+    uploadHelp.textContent = k === 'speech' ? l('Образец голоса и изображение сцены. Клонирование голоса и работа с изображениями поддерживаются отдельными провайдерами — проверьте их возможности ниже.', 'Voice sample and scene image. Voice cloning and image conditioning depend on provider capabilities; inspect them below.') : k === 'video' ? l('Здесь можно загрузить фото. Для видео и аудио используйте HTTPS-ссылки ниже: OpenRouter не принимает их как inline-файлы в видеогенерации.', 'Upload images here. For video and audio, use the HTTPS URL fields below: OpenRouter video generation does not accept inline video/audio files.') : l('До 25 МБ на файл, около 30 МБ суммарно. Вложения отправляются выбранному провайдеру.', 'Up to 25 MB per file, about 30 MB total. Attachments are sent to the selected provider.');
     firstField.hidden = k !== 'video' || !model.raw.supported_frame_images?.includes('first_frame');
     lastField.hidden = k !== 'video' || !model.raw.supported_frame_images?.includes('last_frame');
   }
@@ -145,7 +154,7 @@ export function cloudView(initialKind = 'image') {
   search.oninput = () => filterModels(select.value);
   select.onchange = drawModel;
   const form = el('form', { class: 'or-form' }, field(l('Тип генерации', 'Generation type'), kind), field(l('Поиск', 'Search'), search), field(l('Модель', 'Model'), select), info,
-    promptField, uploadField, firstField, lastField, documentsField, schemaField, parameters, nativeDetails,
+    promptField, uploadField, videoUrlsField, audioUrlsField, firstField, lastField, documentsField, schemaField, parameters, nativeDetails,
     el('p', { class: 'dim' }, l('Нажатие «Сгенерировать» отправит запрос в OpenRouter и может списать средства. Цены зависят от модели и провайдера.', 'Generate sends a request to OpenRouter and may spend credits. Prices depend on the model and provider.')),
     el('div', { class: 'or-actions' }, runButton, button(l('Сохранить по умолчанию', 'Save as default'), () => safe(message, async () => {
       if (!model) return;
@@ -163,12 +172,24 @@ export function cloudView(initialKind = 'image') {
       const allFiles = [...files, ...(!firstField.hidden ? [...first.files] : []), ...(!lastField.hidden ? [...last.files] : [])];
       if (allFiles.reduce((n, f) => n + f.size, 0) > 29 * 2 ** 20) throw new Error(l('Суммарный размер файлов больше 29 МБ.', 'Total attachments exceed 29 MB.'));
       for (const f of files) {
+        if (model.kind === 'video' && !f.type.startsWith('image/')) throw new Error(l('Для видео/аудио нужна HTTPS-ссылка. Добавьте её в поле референсов.', 'Video/audio requires an HTTPS URL. Paste it in the reference URL field.'));
         const url = await dataURL(f);
         if (f.type.startsWith('image/')) attached.push({ type: 'image_url', image_url: { url } });
         else if (f.type.startsWith('audio/')) attached.push(model.kind === 'video' ? { type: 'audio_url', audio_url: { url } } : audioPart(f, url));
         else if (f.type.startsWith('video/')) attached.push({ type: 'video_url', video_url: { url } });
         else if (f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')) attached.push({ type: 'file', file: { filename: f.name, file_data: url } });
         else throw new Error(l('Неподдерживаемый тип файла.', 'Unsupported file type.'));
+      }
+      if (model.kind === 'video') {
+        for (const [input, wrapper, type] of [[videoUrls, videoUrlsField, 'video_url'], [audioUrls, audioUrlsField, 'audio_url']]) {
+          if (wrapper.hidden) continue;
+          for (const link of input.value.split('\n').map(s => s.trim()).filter(Boolean)) {
+            let url;
+            try { url = new URL(link); } catch { throw new Error(l('Введите корректную HTTPS-ссылку на файл.', 'Enter a valid HTTPS file URL.')); }
+            if (url.protocol !== 'https:' || url.username || url.password) throw new Error(l('Нужна HTTPS-ссылка без логина и пароля в адресе.', 'Use an HTTPS URL without embedded credentials.'));
+            attached.push({ type, [type]: { url: url.href } });
+          }
+        }
       }
       if (model.kind === 'transcription') {
         if (attached.length !== 1 || attached[0].type !== 'input_audio') throw new Error(l('Выберите аудиофайл.', 'Choose an audio file.'));
